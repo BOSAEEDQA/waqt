@@ -131,6 +131,39 @@
     .modal .ov-box{min-width:0;width:calc(100vw - 32px);padding:26px 20px}
     .ov-box .big{font-size:44px}
   }
+  /* tasbih counters */
+  .tasbih{margin-top:16px}
+  .tb-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;font-size:15px;color:var(--muted)}
+  .tb-row{display:flex;gap:10px;flex-wrap:wrap}
+  .tb{position:relative;width:150px;min-height:150px;background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:12px 10px 10px;
+      display:flex;flex-direction:column;align-items:center;justify-content:space-between;text-align:center;cursor:pointer;user-select:none;-webkit-user-select:none;
+      touch-action:manipulation;transition:transform .08s,border-color .2s}
+  .tb:active{transform:scale(.96)}
+  .tb .tx{font-family:Amiri,serif;font-size:16px;line-height:1.6;color:var(--text);padding:0 14px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .tb .dial{position:relative;width:76px;height:76px;margin:6px 0 2px}
+  .tb .dial svg{position:absolute;inset:0;transform:rotate(-90deg)}
+  .tb .dial .bgc{stroke:var(--panel2)} .tb .dial .fgc{stroke:var(--accent);transition:stroke-dashoffset .2s}
+  .tb .num{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:700;font-variant-numeric:tabular-nums;color:var(--accent)}
+  .tb .meta{font-size:11px;color:var(--muted);min-height:15px}
+  .tb .more{position:absolute;top:6px;left:6px;width:28px;height:28px;border-radius:50%;color:var(--muted);font-size:18px;line-height:1}
+  .tb .more:hover{background:var(--panel2);color:var(--text)}
+  .tb.hit{border-color:var(--accent2);animation:hit .5s}
+  .tb.hit .fgc{stroke:var(--accent2)} .tb.hit .num{color:var(--accent2)}
+  @keyframes hit{30%{transform:scale(1.05)}}
+  .tb.add{border-style:dashed;color:var(--muted);justify-content:center;gap:6px;font-size:14px}
+  .tb.add b{font-size:34px;font-weight:300;color:var(--accent)}
+  .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+  .chips button{padding:6px 11px;border-radius:999px;border:1px solid var(--line);background:var(--panel2);font-size:13px;color:var(--muted)}
+  .chips button.on{border-color:var(--accent);color:var(--accent)}
+  .modal input[type=text]{width:100%;font-size:16px}
+  .danger-row{display:flex;gap:8px;margin-top:16px}
+  .danger-row .btn{flex:1;font-size:14px;padding:9px}
+  .btn.red{color:var(--danger);border-color:#4a2a26}
+  @media (max-width:600px){
+    .tb-row{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;margin:0 -14px;padding:2px 14px 4px}
+    .tb-row::-webkit-scrollbar{display:none}
+    .tb{width:138px;min-width:138px;min-height:146px}
+  }
   .install{display:none;position:fixed;left:12px;right:12px;bottom:calc(12px + env(safe-area-inset-bottom));background:var(--panel2);border:1px solid var(--accent);border-radius:16px;padding:14px 16px;font-size:14px;line-height:1.8;z-index:40;box-shadow:0 10px 30px rgba(0,0,0,.5)}
   .install.show{display:block}
   .install b{color:var(--accent)}
@@ -162,6 +195,11 @@
 
   <div class="times" id="times"></div>
 
+  <section class="tasbih">
+    <div class="tb-head"><span>📿 التسبيح</span><span id="tbTotal"></span></div>
+    <div class="tb-row" id="tbRow"></div>
+  </section>
+
   <div class="grid">
     <!-- Adhkar -->
     <section class="card">
@@ -191,6 +229,23 @@
     <div class="big" id="ovName">حان وقت الصلاة</div>
     <p id="ovMsg"></p>
     <button class="btn primary" id="ovClose">تمام</button>
+  </div>
+</div>
+
+<!-- tasbih modal -->
+<div class="overlay modal" id="tbOv">
+  <div class="ov-box">
+    <h3 id="tbTitle">إضافة ذكر</h3>
+    <label>الذكر</label>
+    <input type="text" id="tbText" placeholder="اكتب الذكر أو اختر من تحت" maxlength="80">
+    <div class="chips" id="tbSugg"></div>
+    <label>الهدف (اختياري)</label>
+    <div class="chips" id="tbTarget"></div>
+    <div class="danger-row" id="tbEditRow">
+      <button class="btn" id="tbReset">↺ تصفير العدّاد</button>
+      <button class="btn red" id="tbDel">حذف</button>
+    </div>
+    <div class="ctrls"><button class="btn primary" id="tbSave">حفظ</button><button class="btn" id="tbCancel">إلغاء</button></div>
   </div>
 </div>
 
@@ -462,6 +517,69 @@ document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>setTab(b.data
 $('resetDhikr').onclick=()=>{ if(confirm('تبي تعيد عدّاد '+(tab==='m'?'أذكار الصباح':'أذكار المساء')+'؟')){LS.set(progKey(tab),{});renderAdhkar()} };
 
 /* ============================================================
+   5b) TASBIH — عدّادات ذكر مخصصة
+   ============================================================ */
+const TB_SUGG=['سبحان الله وبحمده','سبحان الله','الحمد لله','الله أكبر','لا إله إلا الله','أستغفر الله','لا حول ولا قوة إلا بالله','اللهم صل وسلم على نبينا محمد','سبحان الله وبحمده سبحان الله العظيم'];
+const TB_TARGETS=[0,33,100,1000];
+let tasbih=LS.get('tasbih',null);
+if(!tasbih){ tasbih=[{id:Date.now(),text:'سبحان الله وبحمده',target:100,count:0}]; LS.set('tasbih',tasbih); }
+const esc=t=>t.replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const RC=2*Math.PI*34;
+
+function tbCard(t){
+  const prog=t.target? (t.count && t.count%t.target===0 ? 1 : (t.count%t.target)/t.target) : 0;
+  const rounds=t.target? Math.floor(t.count/t.target):0;
+  const meta=t.target? `الهدف ${t.target}${rounds?` · أتممته ${rounds===1?'مرة':rounds+' مرات'}`:''}` : 'اضغط للعد';
+  return `<div class="tb" data-id="${t.id}">
+    <button class="more" data-more="${t.id}" aria-label="خيارات">⋯</button>
+    <div class="tx">${esc(t.text)}</div>
+    <div class="dial">${t.target?`<svg width="76" height="76"><circle class="bgc" cx="38" cy="38" r="34" stroke-width="5" fill="none"/>
+      <circle class="fgc" cx="38" cy="38" r="34" stroke-width="5" fill="none" stroke-linecap="round" stroke-dasharray="${RC}" stroke-dashoffset="${RC*(1-prog)}"/></svg>`:''}
+      <div class="num">${t.count}</div></div>
+    <div class="meta">${meta}</div></div>`;
+}
+function renderTasbih(){
+  $('tbRow').innerHTML=tasbih.map(tbCard).join('')+`<div class="tb add" id="tbAdd"><b>+</b>إضافة ذكر</div>`;
+  const sum=tasbih.reduce((s,t)=>s+t.count,0);
+  $('tbTotal').textContent=sum?`المجموع ${sum}`:'';
+}
+$('tbRow').addEventListener('click',e=>{
+  const more=e.target.closest('[data-more]'); if(more){ openTb(+more.dataset.more); return; }
+  if(e.target.closest('#tbAdd')){ openTb(null); return; }
+  const card=e.target.closest('.tb'); if(!card) return;
+  const t=tasbih.find(x=>x.id===+card.dataset.id); if(!t) return;
+  t.count++; LS.set('tasbih',tasbih);
+  const tmp=document.createElement('div'); tmp.innerHTML=tbCard(t); const nc=tmp.firstElementChild;
+  card.replaceWith(nc);
+  if(t.target && t.count%t.target===0){ nc.classList.add('hit'); chime(); if(navigator.vibrate) navigator.vibrate([30,60,30]); }
+  else if(navigator.vibrate) navigator.vibrate(10);
+  $('tbTotal').textContent='المجموع '+tasbih.reduce((s,x)=>s+x.count,0);
+});
+
+let tbEditing=null, tbTarget=0;
+function drawTargets(){ $('tbTarget').innerHTML=TB_TARGETS.map(n=>`<button data-n="${n}" class="${n===tbTarget?'on':''}">${n||'بدون'}</button>`).join(''); }
+function openTb(id){
+  tbEditing=id; const t=id?tasbih.find(x=>x.id===id):null;
+  $('tbTitle').textContent=t?'تعديل الذكر':'إضافة ذكر';
+  $('tbText').value=t?t.text:''; tbTarget=t?t.target:100;
+  $('tbEditRow').style.display=t?'flex':'none';
+  $('tbSugg').innerHTML=TB_SUGG.map(x=>`<button>${x}</button>`).join('');
+  drawTargets(); $('tbOv').classList.add('show');
+}
+$('tbSugg').onclick=e=>{ if(e.target.tagName==='BUTTON') $('tbText').value=e.target.textContent; };
+$('tbTarget').onclick=e=>{ const b=e.target.closest('button'); if(b){ tbTarget=+b.dataset.n; drawTargets(); } };
+const closeTb=()=>$('tbOv').classList.remove('show');
+$('tbCancel').onclick=closeTb;
+$('tbSave').onclick=()=>{
+  const text=$('tbText').value.trim(); if(!text){ $('tbText').focus(); return; }
+  if(tbEditing){ const t=tasbih.find(x=>x.id===tbEditing); t.text=text; t.target=tbTarget; }
+  else tasbih.push({id:Date.now(),text,target:tbTarget,count:0});
+  LS.set('tasbih',tasbih); renderTasbih(); closeTb();
+};
+$('tbReset').onclick=()=>{ const t=tasbih.find(x=>x.id===tbEditing); if(t&&confirm('تصفّر عدّاد «'+t.text+'»؟')){ t.count=0; LS.set('tasbih',tasbih); renderTasbih(); closeTb(); } };
+$('tbDel').onclick=()=>{ const t=tasbih.find(x=>x.id===tbEditing); if(t&&confirm('تحذف «'+t.text+'»؟')){ tasbih=tasbih.filter(x=>x!==t); LS.set('tasbih',tasbih); renderTasbih(); closeTb(); } };
+
+/* ============================================================
    6) SETTINGS MODAL
    ============================================================ */
 $('citySel').innerHTML='<option value="">—</option>'+CITIES.map((c,i)=>`<option value="${i}">${c.n}</option>`).join('');
@@ -485,7 +603,7 @@ $('setCancel').onclick=()=>$('setOv').classList.remove('show');
 /* ============================================================
    7) BOOT
    ============================================================ */
-recompute(); renderHeader(); tickPrayer();
+recompute(); renderHeader(); tickPrayer(); renderTasbih();
 { // auto-pick adhkar tab: morning from Fajr until Asr, evening otherwise
   const now=Date.now(), f=today.find(p=>p.key==='fajr').ts, a=today.find(p=>p.key==='asr').ts;
   setTab(now>=f && now<a ? 'm' : 'e');
